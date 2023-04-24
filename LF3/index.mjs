@@ -7,6 +7,35 @@ const ddbDocClient = DynamoDBDocumentClient.from(ddbClient, {
   marshallOptions: { removeUndefinedValues: true },
 });
 
+const validateLocation = (location) => {
+  if (!location || typeof location !== "object") {
+    return false;
+  }
+
+  const { label, geometry } = location;
+
+  if (!label || typeof label !== "string") {
+    return false;
+  }
+
+  if (
+    !geometry ||
+    !geometry.point ||
+    !Array.isArray(geometry.point) ||
+    geometry.point.length !== 2
+  ) {
+    return false;
+  }
+
+  const [latitude, longitude] = geometry.point;
+
+  if (typeof latitude !== "number" || typeof longitude !== "number") {
+    return false;
+  }
+
+  return true;
+};
+
 const validateEventInput = (attribute) => {
   const { key, value } = attribute;
 
@@ -15,11 +44,16 @@ const validateEventInput = (attribute) => {
     name: "string",
     dateTime: "string",
     description: "string",
+    detail: "string",
     capacity: "number",
     isPublic: "boolean",
     createdAt: "string",
     image: "string",
   };
+
+  if (key === "location") {
+    return validateLocation(value);
+  }
 
   if (!value || typeof value !== attributeTypes[key]) {
     return false;
@@ -64,7 +98,17 @@ const handler = async (event) => {
 
     return response;
   }
-  const { name, dateTime, description, capacity, isPublic, createdAt, image } = eventData;
+  const {
+    name,
+    dateTime,
+    description,
+    detail,
+    capacity,
+    isPublic,
+    createdAt,
+    location,
+    image,
+  } = eventData;
 
   // Dynamic update parameters
   let updateExpression = "set";
@@ -75,9 +119,11 @@ const handler = async (event) => {
     { key: "name", value: name },
     { key: "dateTime", value: dateTime },
     { key: "description", value: description },
+    { key: "detail", value: detail },
     { key: "capacity", value: capacity },
     { key: "isPublic", value: isPublic },
     { key: "createdAt", value: createdAt },
+    { key: "location", value: location },
     { key: "image", value: image },
   ];
 
@@ -145,3 +191,23 @@ const handler = async (event) => {
 };
 
 export { handler };
+
+// location:
+// {
+//   geometry: {
+//     point:
+//       [
+//         -122.34014899999994, // Longitude point
+//         47.61609000000004 // Latitude point
+//       ],
+//   },
+//   addressNumber: "2131" // optional string for the address number alone
+//   country: "USA" // optional Alpha-3 country code
+//   label: "Amazon Go, 2131 7th Ave, Seattle, WA, 98121, USA" // Optional string
+//   municipality: "Seattle" // Optional string
+//   neighborhood: undefined // Optional string
+//   postalCode: "98121" // Optional string
+//   region: "Washington" // Optional string
+//   street: "7th Ave" // Optional string
+//   subRegion: "King County" // Optional string
+// }
