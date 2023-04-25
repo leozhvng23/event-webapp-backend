@@ -7,6 +7,11 @@ const ddbClient = new DynamoDBClient({ region });
 const ddbDocClient = DynamoDBDocumentClient.from(ddbClient);
 const sqsClient = new SQSClient({ region });
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Credentials": true,
+};
+
 const handler = async (event) => {
   console.log("Received event:", event);
   const { eid, uid } = event;
@@ -14,10 +19,7 @@ const handler = async (event) => {
   if (!eid || !uid) {
     return {
       statusCode: 400,
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Credentials": true,
-      },
+      headers: corsHeaders,
       body: JSON.stringify({ message: "Invalid input data." }),
     };
   }
@@ -103,11 +105,8 @@ const handler = async (event) => {
 
     const response = {
       statusCode: 201,
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Credentials": true,
-      },
-      body: JSON.stringify({ message: "Event created successfully." }),
+      headers: corsHeaders,
+      body: JSON.stringify({ message: "Invitation created successfully." }),
     };
 
     return response;
@@ -116,10 +115,7 @@ const handler = async (event) => {
 
     return {
       statusCode: 500,
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Credentials": true,
-      },
+      headers: corsHeaders,
       body: JSON.stringify({ message: "Error creating invitation." }),
     };
   }
