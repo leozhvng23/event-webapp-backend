@@ -14,9 +14,9 @@ const corsHeaders = {
 
 const handler = async (event) => {
   console.log("Received event:", event);
-  const { eid, uid } = event;
+  const { eid, email } = event;
 
-  if (!eid || !uid) {
+  if (!eid || !email) {
     return {
       statusCode: 400,
       headers: corsHeaders,
@@ -26,14 +26,14 @@ const handler = async (event) => {
 
   const item = {
     eid,
-    uid,
+    email,
     invitationStatus: "PENDING",
   };
 
   try {
     const dbResult = await ddbDocClient.send(
       new PutCommand({
-        TableName: "Eventful-User-Event",
+        TableName: "Eventful-Invitations",
         Item: item,
       })
     );
@@ -79,7 +79,7 @@ const handler = async (event) => {
       eventId: eid,
       hostName,
       hostId,
-      recipientId: uid,
+      recipientEmail: email,
     };
 
     console.log("SQS message body:", sqsMessageBody);
@@ -89,9 +89,9 @@ const handler = async (event) => {
       QueueUrl: "https://sqs.us-east-1.amazonaws.com/612277434742/Eventful-Invitations",
       MessageBody: JSON.stringify(sqsMessageBody),
       MessageAttributes: {
-        RecipientId: {
+        RecipientEmail: {
           DataType: "String",
-          StringValue: uid,
+          StringValue: email,
         },
       },
     };
@@ -134,9 +134,11 @@ export { handler };
 
 // exampleMessage = {
 //   eventName: "Leo's Test Event 4",
-//   eventId: "66b922b7-eba3-426c-9b54-e7858116a380",
-//   hostName: "Leo Zhang",
-//   hostId: "d2435856-adb6-4ccf-a0b0-63e242c34850",
-//   recipientId: "d2435856-adb6-4ccf-a0b0-63e242c34850",
+//   eventId: '66b922b7-eba3-426c-9b54-e7858116a380',
+//   hostName: 'Leo Zhang',
+//   hostId: 'd2435856-adb6-4ccf-a0b0-63e242c34850',
+//   recipientId: 'd2435856-adb6-4ccf-a0b0-63e242c34850',
+//   recipientName: 'Leo Zhang',
+//   recipientEmail: 'leozhvng@gmail.com'
 // };
 // Message Attribute: RecipientId
