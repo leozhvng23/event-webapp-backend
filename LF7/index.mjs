@@ -76,12 +76,10 @@ const handler = async (event) => {
             Charset: "UTF-8",
             Data: `Dear guest,
   
-  ${hostName} has invited you to "${eventName}".
-  
-  ${
-    message ? `${hostName}'s personal message: \n${message}\n\n` : ""
-  }Please RSVP to the event by clicking on the following link:
-  https://eventful.com/event/${eid}
+  ${hostName} has invited you to "${eventName}"${
+              message ? ` with a message:\n\n${message}\n\n` : ".\n"
+            }Please RSVP to the event by clicking on the following link:
+  https://master.d1bpct3tu5v4qi.amplifyapp.com/event/${eid}
   
   We hope to see you there!
   
