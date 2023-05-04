@@ -1,11 +1,13 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, PutCommand, GetCommand } from "@aws-sdk/lib-dynamodb";
 import { SQSClient, SendMessageCommand } from "@aws-sdk/client-sqs";
+import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
 
 const region = "us-east-1";
 const ddbClient = new DynamoDBClient({ region });
 const ddbDocClient = DynamoDBDocumentClient.from(ddbClient);
 const sqsClient = new SQSClient({ region });
+const sesClient = new SESClient({ region });
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -14,7 +16,7 @@ const corsHeaders = {
 
 const handler = async (event) => {
   console.log("Received event:", event);
-  const { eid, email } = event;
+  const { eid, email, message } = event;
 
   if (!eid || !email) {
     return {
@@ -31,16 +33,6 @@ const handler = async (event) => {
   };
 
   try {
-    const dbResult = await ddbDocClient.send(
-      new PutCommand({
-        TableName: "Eventful-Invitations",
-        Item: item,
-      })
-    );
-    if (!dbResult) {
-      throw new Error("Error creating invitation.");
-    }
-
     // get event name
     const eventParams = {
       TableName: "Eventful-Events",
@@ -74,12 +66,67 @@ const handler = async (event) => {
 
     const hostName = userData.Item.name;
 
+    const emailParams = {
+      Destination: {
+        ToAddresses: [email],
+      },
+      Message: {
+        Body: {
+          Text: {
+            Charset: "UTF-8",
+            Data: `Dear guest,
+  
+  ${hostName} has invited you to "${eventName}".
+  
+  ${
+    message ? `${hostName}'s personal message: \n${message}\n\n` : ""
+  }Please RSVP to the event by clicking on the following link:
+  https://eventful.com/event/${eid}
+  
+  We hope to see you there!
+  
+  Best,
+  The Eventful Team`,
+          },
+        },
+        Subject: {
+          Charset: "UTF-8",
+          Data: `You're invited to "${eventName}"`,
+        },
+      },
+      Source: "clic.cloud.project@gmail.com",
+    };
+
+    try {
+      const sesResult = await sesClient.send(new SendEmailCommand(emailParams));
+      console.log("SES result:", sesResult);
+    } catch (error) {
+      console.error("Error sending email:", error);
+
+      return {
+        statusCode: 500,
+        headers: corsHeaders,
+        body: JSON.stringify({ message: "Error sending invitation email." }),
+      };
+    }
+
+    const dbResult = await ddbDocClient.send(
+      new PutCommand({
+        TableName: "Eventful-Invitations",
+        Item: item,
+      })
+    );
+    if (!dbResult) {
+      throw new Error("Error creating invitation.");
+    }
+
     const sqsMessageBody = {
       eventName,
       eventId: eid,
       hostName,
       hostId,
       recipientEmail: email,
+      message,
     };
 
     console.log("SQS message body:", sqsMessageBody);
@@ -140,5 +187,6 @@ export { handler };
 //   recipientId: 'd2435856-adb6-4ccf-a0b0-63e242c34850',
 //   recipientName: 'Leo Zhang',
 //   recipientEmail: 'leozhvng@gmail.com'
+//   message: 'Hello, this is a test message.'
 // };
 // Message Attribute: RecipientId
