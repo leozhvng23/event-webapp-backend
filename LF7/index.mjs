@@ -121,8 +121,8 @@ const handler = async (event) => {
     const sqsMessageBody = {
       eventName,
       eventId: eid,
-      hostName,
-      hostId,
+      senderName: hostName,
+      senderId: hostId,
       recipientEmail: email,
       message,
     };
