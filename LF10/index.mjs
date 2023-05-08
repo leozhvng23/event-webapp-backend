@@ -54,6 +54,7 @@ const handler = async (event) => {
       recipientEmail: hostEmail,
       recipientName: hostName,
       invitationStatus,
+      timestamp: new Date().toISOString(),
     };
 
     console.log("SQS message body:", sqsMessageBody);
