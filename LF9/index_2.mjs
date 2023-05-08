@@ -52,65 +52,97 @@ const handler = async (event) => {
   }
 };
 
-// Implement fetch_all_events, fetch_hosting_events, and fetch_invited_events functions here
-// ...
+// const getStartKey = async (
+//   tableName,
+//   indexName,
+//   keyConditionExpression,
+//   expressionAttributeValues,
+//   page,
+//   limit
+// ) => {
+//   const params = {
+//     TableName: tableName,
+//     IndexName: indexName,
+//     KeyConditionExpression: keyConditionExpression,
+//     ExpressionAttributeValues: expressionAttributeValues,
+//     ScanIndexForward: false,
+//     Limit: (page - 1) * limit,
+//   };
 
-const getStartKey = async (
-  tableName,
-  indexName,
-  keyConditionExpression,
-  expressionAttributeValues,
-  page,
-  limit
-) => {
-  const params = {
-    TableName: tableName,
-    IndexName: indexName,
-    KeyConditionExpression: keyConditionExpression,
-    ExpressionAttributeValues: expressionAttributeValues,
-    ScanIndexForward: false,
-    Limit: (page - 1) * limit,
-  };
-
-  try {
-    const data = await ddbDocClient.send(new QueryCommand(params));
-    return data.LastEvaluatedKey;
-  } catch (error) {
-    console.error("Error getting start key:", error);
-    return null;
-  }
-};
+//   try {
+//     const data = await ddbDocClient.send(new QueryCommand(params));
+//     return data.LastEvaluatedKey;
+//   } catch (error) {
+//     console.error("Error getting start key:", error);
+//     return null;
+//   }
+// };
 
 const fetch_hosting_events = async (uid, page, limit) => {
-  const params = {
-    TableName: "Eventful-Events",
-    IndexName: "uid-createdAt-index",
-    KeyConditionExpression: "uid = :uid",
-    ExpressionAttributeValues: {
-      ":uid": uid,
-    },
-    Limit: limit,
-  };
+  let startKey = null;
+  let items = [];
+  let currentPage = 1;
 
-  const startKey = await getStartKey(
-    "Eventful-Events",
-    "uid-createdAt-index",
-    "uid = :uid",
-    { ":uid": uid },
-    page,
-    limit
-  );
+  while (currentPage <= page) {
+    const params = {
+      TableName: "Eventful-Events",
+      IndexName: "uid-createdAt-index",
+      KeyConditionExpression: "uid = :uid",
+      ExpressionAttributeValues: {
+        ":uid": uid,
+      },
+      ScanIndexForward: false,
+      Limit: limit,
+    };
 
-  if (startKey) {
-    params.ExclusiveStartKey = startKey;
+    if (startKey) {
+      params.ExclusiveStartKey = startKey;
+    }
+
+    const data = await ddbDocClient.send(new QueryCommand(params));
+    startKey = data.LastEvaluatedKey;
+
+    if (currentPage === page) {
+      items = data.Items;
+    }
+
+    currentPage += 1;
   }
 
-  const data = await ddbDocClient.send(new QueryCommand(params));
-  return data.Items;
+  return items;
 };
 
 const fetch_invited_events = async (email, page, limit) => {
-  const eventIds = await get_invited_event_ids(email, page, limit);
+  let startKey = null;
+  let eventIds = [];
+  let currentPage = 1;
+
+  while (currentPage <= page) {
+    const params = {
+      TableName: "Eventful-Invitations",
+      IndexName: "email-index",
+      KeyConditionExpression: "email = :email",
+      ExpressionAttributeValues: {
+        ":email": email,
+      },
+      ProjectionExpression: "eid",
+      Limit: limit,
+    };
+
+    if (startKey) {
+      params.ExclusiveStartKey = startKey;
+    }
+
+    const data = await ddbDocClient.send(new QueryCommand(params));
+    startKey = data.LastEvaluatedKey;
+
+    if (currentPage === page) {
+      eventIds = data.Items.map((item) => item.eid);
+    }
+
+    currentPage += 1;
+  }
+
   const events = await Promise.all(eventIds.map((eventId) => get_event_by_id(eventId)));
   return events;
 };
@@ -136,34 +168,6 @@ const mergeEvents = (events1, events2) => {
 
   const merged = Array.from(eventMap.values());
   return merged.sort((a, b) => b.createdAt - a.createdAt); // sort in descending order of `createdAt`
-};
-
-const get_invited_event_ids = async (email, page, limit) => {
-  const params = {
-    TableName: "Eventful-Invitations",
-    IndexName: "email-index",
-    KeyConditionExpression: "email = :email",
-    ExpressionAttributeValues: {
-      ":email": email,
-    },
-    ProjectionExpression: "eid",
-    Limit: limit,
-  };
-
-  const startKey = await getStartKey(
-    "Eventful-Invitations",
-    "email-index",
-    "email = :email",
-    { ":email": email },
-    page,
-    limit
-  );
-  if (startKey) {
-    params.ExclusiveStartKey = startKey;
-  }
-
-  const data = await ddbDocClient.send(new QueryCommand(params));
-  return data.Items.map((item) => item.eid);
 };
 
 const get_event_by_id = async (id) => {
