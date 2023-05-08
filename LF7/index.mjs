@@ -33,6 +33,26 @@ const handler = async (event) => {
   };
 
   try {
+    // Check if the user has already been invited
+    const invitationParams = {
+      TableName: "Eventful-Invitations",
+      Key: {
+        eid: eid,
+        email: email,
+      },
+    };
+
+    const invitationData = await ddbDocClient.send(new GetCommand(invitationParams));
+
+    if (invitationData.Item) {
+      console.log("Invitation has already been sent.");
+      return {
+        statusCode: 400,
+        headers: corsHeaders,
+        body: JSON.stringify({ message: "Invitation has already been sent." }),
+      };
+    }
+
     // get event name
     const eventParams = {
       TableName: "Eventful-Events",
